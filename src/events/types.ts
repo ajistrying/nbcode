@@ -172,6 +172,51 @@ export type ErrorEvent = {
 }
 
 // ---------------------------------------------------------------------------
+// Streaming events (Phase 7 — framework-agnostic stream lifecycle)
+// ---------------------------------------------------------------------------
+
+export type StreamingTextEvent = {
+  type: 'streaming.text'
+  text: string
+  messageId: string
+}
+
+export type StreamingToolUseEvent = {
+  type: 'streaming.tool-use'
+  toolName: string
+  toolCallId: string
+  index: number
+}
+
+export type StreamingThinkingEvent = {
+  type: 'streaming.thinking'
+  text: string
+  isDelta: boolean
+}
+
+export type StreamingCompleteEvent = {
+  type: 'streaming.complete'
+  messageId: string
+}
+
+export type StreamingRequestStartEvent = {
+  type: 'streaming.request-start'
+}
+
+export type StreamingModeChangeEvent = {
+  type: 'streaming.mode-change'
+  mode: 'requesting' | 'thinking' | 'responding' | 'tool-input' | 'tool-use'
+}
+
+export type StreamingEvent =
+  | StreamingTextEvent
+  | StreamingToolUseEvent
+  | StreamingThinkingEvent
+  | StreamingCompleteEvent
+  | StreamingRequestStartEvent
+  | StreamingModeChangeEvent
+
+// ---------------------------------------------------------------------------
 // Discriminated union of all application events
 // ---------------------------------------------------------------------------
 
@@ -201,6 +246,8 @@ export type AppEvent =
   // System
   | ShutdownEvent
   | ErrorEvent
+  // Streaming
+  | StreamingEvent
 
 /**
  * Union of all event type string literals.

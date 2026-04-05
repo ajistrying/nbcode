@@ -1,6 +1,11 @@
 import { feature } from 'bun:bundle'
 import type Anthropic from '@anthropic-ai/sdk'
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages.js'
+import {
+  isToolCallBlock,
+  getToolName,
+  getToolInput,
+} from '../toolBlockCompat.js'
 import { mkdir, writeFile } from 'fs/promises'
 import { dirname, join } from 'path'
 import { z } from 'zod/v4'
@@ -343,11 +348,11 @@ export function buildTranscriptEntries(messages: Message[]): TranscriptEntry[] {
       for (const block of msg.message.content) {
         // Only include tool_use blocks — assistant text is model-authored
         // and could be crafted to influence the classifier's decision.
-        if (block.type === 'tool_use') {
+        if (isToolCallBlock(block)) {
           blocks.push({
             type: 'tool_use',
-            name: block.name,
-            input: block.input,
+            name: getToolName(block),
+            input: getToolInput(block),
           })
         }
       }

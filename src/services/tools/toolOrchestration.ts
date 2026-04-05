@@ -1,9 +1,14 @@
 import type { ToolUseBlock } from '@anthropic-ai/sdk/resources/index.mjs'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import { findToolByName, type ToolUseContext } from '../../Tool.js'
+import type { InternalToolCallPart } from '../../types/internal-messages.js'
 import type { AssistantMessage, Message } from '../../types/message.js'
 import { all } from '../../utils/generators.js'
-import { type MessageUpdateLazy, runToolUse } from './toolExecution.js'
+import {
+  type MessageUpdateLazy,
+  runToolUse,
+  toolUseBlockToInternalToolCall,
+} from './toolExecution.js'
 
 function getMaxToolUseConcurrency(): number {
   return (
@@ -82,6 +87,16 @@ export async function* runTools(
 }
 
 type Batch = { isConcurrencySafe: boolean; blocks: ToolUseBlock[] }
+
+/**
+ * Convert an array of ToolUseBlocks to InternalToolCallParts.
+ * Utility for code that wants to operate on the provider-neutral type.
+ */
+export function toInternalToolCalls(
+  blocks: ToolUseBlock[],
+): InternalToolCallPart[] {
+  return blocks.map(toolUseBlockToInternalToolCall)
+}
 
 /**
  * Partition tool calls into batches where each batch is either:

@@ -1,5 +1,13 @@
 import { feature } from 'bun:bundle'
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
+import {
+  isToolCallBlock,
+  isToolResultBlock,
+  getToolCallId,
+  getToolName,
+  getToolInput,
+  getToolUseId,
+} from '../../utils/toolBlockCompat.js'
 import type { QuerySource } from '../../constants/querySource.js'
 import type { ToolUseContext } from '../../Tool.js'
 import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
@@ -176,7 +184,7 @@ export function estimateMessageTokens(messages: Message[]): number {
     for (const block of message.message.content) {
       if (block.type === 'text') {
         totalTokens += roughTokenCountEstimation(block.text)
-      } else if (block.type === 'tool_result') {
+      } else if (isToolResultBlock(block)) {
         totalTokens += calculateToolResultTokens(block)
       } else if (block.type === 'image' || block.type === 'document') {
         totalTokens += IMAGE_MAX_TOKEN_SIZE
@@ -187,11 +195,11 @@ export function estimateMessageTokens(messages: Message[]): number {
         totalTokens += roughTokenCountEstimation(block.thinking)
       } else if (block.type === 'redacted_thinking') {
         totalTokens += roughTokenCountEstimation(block.data)
-      } else if (block.type === 'tool_use') {
+      } else if (isToolCallBlock(block)) {
         // Match roughTokenCountEstimationForBlock: count name + input,
         // not the JSON wrapper or id field.
         totalTokens += roughTokenCountEstimation(
-          block.name + jsonStringify(block.input ?? {}),
+          getToolName(block) + jsonStringify(getToolInput(block) ?? {}),
         )
       } else {
         // server_tool_use, web_search_tool_result, etc.
@@ -231,8 +239,8 @@ function collectCompactableToolIds(messages: Message[]): string[] {
       Array.isArray(message.message.content)
     ) {
       for (const block of message.message.content) {
-        if (block.type === 'tool_use' && COMPACTABLE_TOOLS.has(block.name)) {
-          ids.push(block.id)
+        if (isToolCallBlock(block) && COMPACTABLE_TOOLS.has(getToolName(block))) {
+          ids.push(getToolCallId(block))
         }
       }
     }
@@ -317,12 +325,12 @@ async function cachedMicrocompactPath(
       const groupIds: string[] = []
       for (const block of message.message.content) {
         if (
-          block.type === 'tool_result' &&
-          compactableToolIds.has(block.tool_use_id) &&
-          !state.registeredTools.has(block.tool_use_id)
+          isToolResultBlock(block) &&
+          compactableToolIds.has(getToolUseId(block)) &&
+          !state.registeredTools.has(getToolUseId(block))
         ) {
-          mod.registerToolResult(state, block.tool_use_id)
-          groupIds.push(block.tool_use_id)
+          mod.registerToolResult(state, getToolUseId(block))
+          groupIds.push(getToolUseId(block))
         }
       }
       mod.registerToolMessage(state, groupIds)
@@ -474,8 +482,8 @@ function maybeTimeBasedMicrocompact(
     let touched = false
     const newContent = message.message.content.map(block => {
       if (
-        block.type === 'tool_result' &&
-        clearSet.has(block.tool_use_id) &&
+        isToolResultBlock(block) &&
+        clearSet.has(getToolUseId(block)) &&
         block.content !== TIME_BASED_MC_CLEARED_MESSAGE
       ) {
         tokensSaved += calculateToolResultTokens(block)

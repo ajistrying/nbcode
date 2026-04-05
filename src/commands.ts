@@ -16,6 +16,7 @@ import compact from './commands/compact/index.js'
 import config from './commands/config/index.js'
 import { context, contextNonInteractive } from './commands/context/index.js'
 import cost from './commands/cost/index.js'
+import diagnostics from './commands/diagnostics/index.js'
 import diff from './commands/diff/index.js'
 import ctx_viz from './commands/ctx_viz/index.js'
 import doctor from './commands/doctor/index.js'
@@ -135,6 +136,8 @@ import agents from './commands/agents/index.js'
 import plugin from './commands/plugin/index.js'
 import reloadPlugins from './commands/reload-plugins/index.js'
 import rewind from './commands/rewind/index.js'
+import undo from './commands/undo/index.js'
+import snapshotsCmd from './commands/snapshots/index.js'
 import heapDump from './commands/heapdump/index.js'
 import mockLimits from './commands/mock-limits/index.js'
 import bridgeKick from './commands/bridge-kick.js'
@@ -270,6 +273,7 @@ const COMMANDS = memoize((): Command[] => [
   context,
   contextNonInteractive,
   cost,
+  diagnostics,
   diff,
   doctor,
   effort,
@@ -307,6 +311,7 @@ const COMMANDS = memoize((): Command[] => [
   review,
   ultrareview,
   rewind,
+  snapshotsCmd,
   securityReview,
   terminalSetup,
   upgrade,
@@ -337,6 +342,7 @@ const COMMANDS = memoize((): Command[] => [
   passes,
   ...(peersCmd ? [peersCmd] : []),
   tasks,
+  undo,
   ...(workflowsCmd ? [workflowsCmd] : []),
   ...(torch ? [torch] : []),
   ...(ultraplan ? [ultraplan] : []),

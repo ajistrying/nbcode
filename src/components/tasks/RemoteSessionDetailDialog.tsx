@@ -13,6 +13,7 @@ import type { RemoteAgentTaskState } from '../../tasks/RemoteAgentTask/RemoteAge
 import { getRemoteTaskSessionUrl } from '../../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME } from '../../tools/AgentTool/constants.js';
 import { ASK_USER_QUESTION_TOOL_NAME } from '../../tools/AskUserQuestionTool/prompt.js';
+import { isToolCallBlock, getToolName } from '../../utils/toolBlockCompat.js';
 import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../../tools/ExitPlanModeTool/constants.js';
 import { openBrowser } from '../../utils/browser.js';
 import { errorMessage } from '../../utils/errors.js';
@@ -98,12 +99,12 @@ function UltraplanSessionDetail(t0) {
       continue;
     }
     for (const block of msg.message.content) {
-      if (block.type !== "tool_use") {
+      if (!isToolCallBlock(block)) {
         continue;
       }
       calls++;
       lastBlock = block;
-      if (block.name === AGENT_TOOL_NAME || block.name === LEGACY_AGENT_TOOL_NAME) {
+      if (getToolName(block) === AGENT_TOOL_NAME || getToolName(block) === LEGACY_AGENT_TOOL_NAME) {
         spawns++;
       }
     }

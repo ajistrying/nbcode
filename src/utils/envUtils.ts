@@ -58,10 +58,10 @@ export function isEnvDefinedFalsy(
  * — notably startKeychainPrefetch() at main.tsx top-level.
  */
 export function isBareMode(): boolean {
-  return (
-    isEnvTruthy(process.env.CLAUDE_CODE_SIMPLE) ||
-    process.argv.includes('--bare')
-  )
+  // Noble Base Code: always run in bare/API-key-only mode.
+  // No OAuth, no Claude.ai subscriber checks, no keychain access.
+  // Auth is exclusively via ANTHROPIC_API_KEY env var.
+  return true
 }
 
 /**

@@ -398,6 +398,9 @@ export function getMergedBetas(
   model: string,
   options?: { isAgenticQuery?: boolean },
 ): string[] {
+  if (getAPIProvider() === 'openai_compatible') {
+    return []
+  }
   const baseBetas = [...getModelBetas(model)]
 
   // Agentic queries always need claude-code and cli-internal beta headers.

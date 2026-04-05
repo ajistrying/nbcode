@@ -4,6 +4,14 @@ import type {
   ContentBlockParam,
   MessageParam,
 } from '@anthropic-ai/sdk/resources/index.mjs'
+import {
+  isToolCallBlock,
+  isToolResultBlock,
+  getToolName,
+  getToolInput,
+  getToolCallId,
+  getToolUseId,
+} from '../../utils/toolBlockCompat.js'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import {
   SSEClientTransport,

@@ -34,6 +34,9 @@ export type ModelName = string
 export type ModelSetting = ModelName | ModelAlias | null
 
 export function getSmallFastModel(): ModelName {
+  if (getAPIProvider() === 'openai_compatible') {
+    return process.env.OPENAI_MODEL || 'default'
+  }
   return process.env.ANTHROPIC_SMALL_FAST_MODEL || getDefaultHaikuModel()
 }
 
@@ -176,6 +179,10 @@ export function getRuntimeMainLoopModel(params: {
  * @returns The default model setting to use
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
+  // OpenAI-compatible provider: use OPENAI_MODEL directly
+  if (getAPIProvider() === 'openai_compatible') {
+    return process.env.OPENAI_MODEL || 'default'
+  }
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
   if (process.env.USER_TYPE === 'ant') {
     return (

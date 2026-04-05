@@ -1,5 +1,6 @@
 import { feature } from 'bun:bundle'
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
+import { isToolCallBlock, isToolResultBlock } from '../../utils/toolBlockCompat.js'
 import uniqBy from 'lodash-es/uniqBy.js'
 import { dirname } from 'path'
 import { getProjectRoot } from 'src/bootstrap/state.js'
@@ -244,7 +245,7 @@ async function executeForkedSkill(
         const normalizedNew = normalizeMessages([message])
         for (const m of normalizedNew) {
           const hasToolContent = m.message.content.some(
-            c => c.type === 'tool_use' || c.type === 'tool_result',
+            c => isToolCallBlock(c) || isToolResultBlock(c),
           )
           if (hasToolContent) {
             onProgress({

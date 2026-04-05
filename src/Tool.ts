@@ -10,7 +10,18 @@ import type { UUID } from 'crypto'
 import type { z } from 'zod/v4'
 import type { Command } from './commands.js'
 import type { CanUseToolFn } from './hooks/useCanUseTool.js'
+import type {
+  InternalToolCallPart,
+  InternalToolResultPart,
+  InternalToolResultOutput,
+} from './types/internal-messages.js'
 import type { ThinkingConfig } from './utils/thinking.js'
+
+// ── Transitional type aliases ────────────────────────────────────
+// Re-export provider-neutral types so downstream code can start importing
+// them from Tool.ts during the migration. New code should prefer these
+// over the Anthropic SDK types (ToolUseBlock, ToolResultBlockParam).
+export type { InternalToolCallPart, InternalToolResultPart, InternalToolResultOutput }
 
 export type ToolInputJSONSchema = {
   [x: string]: unknown

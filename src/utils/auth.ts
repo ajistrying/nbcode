@@ -98,6 +98,9 @@ function isManagedOAuthContext(): boolean {
 /** Whether we are supporting direct 1P auth. */
 // this code is closely related to getAuthTokenSource
 export function isAnthropicAuthEnabled(): boolean {
+  // OpenAI-compatible providers handle their own auth via OPENAI_API_KEY
+  if (isEnvTruthy(process.env.OPENAI_COMPATIBLE)) return false
+
   // --bare: API-key-only, never OAuth.
   if (isBareMode()) return false
 

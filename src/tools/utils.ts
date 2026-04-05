@@ -4,6 +4,7 @@ import type {
   SystemMessage,
   UserMessage,
 } from 'src/types/message.js'
+import { isToolCallBlock, getToolCallId, getToolName } from '../utils/toolBlockCompat.js'
 
 /**
  * Tags user messages with a sourceToolUseID so they stay transient until the tool resolves.
@@ -32,9 +33,9 @@ export function getToolUseIDFromParentMessage(
   toolName: string,
 ): string | undefined {
   const toolUseBlock = parentMessage.message.content.find(
-    block => block.type === 'tool_use' && block.name === toolName,
+    block => isToolCallBlock(block) && getToolName(block) === toolName,
   )
-  return toolUseBlock && toolUseBlock.type === 'tool_use'
-    ? toolUseBlock.id
+  return toolUseBlock && isToolCallBlock(toolUseBlock)
+    ? getToolCallId(toolUseBlock)
     : undefined
 }

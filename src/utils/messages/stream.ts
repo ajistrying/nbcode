@@ -17,10 +17,18 @@ import type {
 } from '../../types/message.js'
 import type { SpinnerMode } from '../../components/Spinner.js'
 import { isConnectorTextBlock } from '../../types/connectorText.js'
+import type { InternalToolCallPart } from '../../types/internal-messages.js'
 
 export type StreamingToolUse = {
   index: number
   contentBlock: BetaToolUseBlock
+  unparsedToolInput: string
+}
+
+/** Provider-neutral streaming tool use tracking. */
+export type InternalStreamingToolUse = {
+  index: number
+  toolCall: InternalToolCallPart
   unparsedToolInput: string
 }
 

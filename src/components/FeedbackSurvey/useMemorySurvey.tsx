@@ -13,6 +13,7 @@ import { extractTextContent, getLastAssistantMessage } from '../../utils/message
 import { logOTelEvent } from '../../utils/telemetry/events.js';
 import { submitTranscriptShare } from './submitTranscriptShare.js';
 import type { TranscriptShareResponse } from './TranscriptSharePrompt.js';
+import { isToolCallBlock, getToolName } from '../../utils/toolBlockCompat.js';
 import { useSurveyState } from './useSurveyState.js';
 import type { FeedbackSurveyResponse } from './utils.js';
 const HIDE_THANKS_AFTER_MS = 3000;
@@ -31,7 +32,7 @@ function hasMemoryFileRead(messages: Message[]): boolean {
       continue;
     }
     for (const block of content) {
-      if (block.type !== 'tool_use' || block.name !== FILE_READ_TOOL_NAME) {
+      if (!isToolCallBlock(block) || getToolName(block) !== FILE_READ_TOOL_NAME) {
         continue;
       }
       const input = block.input as {

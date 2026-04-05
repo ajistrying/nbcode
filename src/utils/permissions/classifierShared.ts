@@ -7,6 +7,11 @@
  */
 
 import type { BetaContentBlock } from '@anthropic-ai/sdk/resources/beta/messages.js'
+import {
+  isToolCallBlock,
+  getToolName,
+  getToolInput,
+} from '../toolBlockCompat.js'
 import type { z } from 'zod/v4'
 
 /**
@@ -16,11 +21,11 @@ export function extractToolUseBlock(
   content: BetaContentBlock[],
   toolName: string,
 ): Extract<BetaContentBlock, { type: 'tool_use' }> | null {
-  const block = content.find(b => b.type === 'tool_use' && b.name === toolName)
-  if (!block || block.type !== 'tool_use') {
+  const block = content.find(b => isToolCallBlock(b) && getToolName(b) === toolName)
+  if (!block || !isToolCallBlock(block)) {
     return null
   }
-  return block
+  return block as Extract<BetaContentBlock, { type: 'tool_use' }>
 }
 
 /**

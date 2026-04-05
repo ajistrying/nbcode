@@ -3,6 +3,7 @@ import * as React from 'react';
 import { filterToolProgressMessages, findToolByName, type Tools } from '../../Tool.js';
 import type { GroupedToolUseMessage } from '../../types/message.js';
 import type { buildMessageLookups } from '../../utils/messages.js';
+import { isToolResultBlock, getToolUseId, getToolCallId } from '../../utils/toolBlockCompat.js';
 type Props = {
   message: GroupedToolUseMessage;
   tools: Tools;
@@ -29,8 +30,8 @@ export function GroupedToolUseContent({
   }>();
   for (const resultMsg of message.results) {
     for (const content of resultMsg.message.content) {
-      if (content.type === 'tool_result') {
-        resultsByToolUseId.set(content.tool_use_id, {
+      if (isToolResultBlock(content)) {
+        resultsByToolUseId.set(getToolUseId(content), {
           param: content,
           output: resultMsg.toolUseResult
         });

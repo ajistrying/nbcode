@@ -15,6 +15,13 @@ import type {
   SystemLocalCommandMessage,
   UserMessage,
 } from '../../types/message.js'
+import type {
+  InternalAssistantMessage,
+  InternalToolCallPart,
+  InternalToolMessage,
+  InternalToolResultPart,
+} from '../../types/internal-messages.js'
+import { hasToolCalls, getToolCalls } from '../../types/internal-messages.js'
 import { NO_CONTENT_MESSAGE } from '../../constants/messages.js'
 import { isAutoMemoryEnabled } from '../../memdir/paths.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
@@ -284,3 +291,34 @@ export function isThinkingMessage(message: Message): boolean {
 export const EMPTY_STRING_SET: ReadonlySet<string> = Object.freeze(
   new Set<string>(),
 )
+
+// ═══════════════════════════════════════════════════════════════════
+// Internal (provider-neutral) type predicates
+// ═══════════════════════════════════════════════════════════════════
+
+// Re-export internal helpers for convenience
+export { hasToolCalls, getToolCalls }
+
+/** Check if an internal message contains tool calls (hyphenated format). */
+export function isInternalToolCallMessage(msg: {
+  role: string
+  content: unknown
+}): boolean {
+  if (msg.role !== 'assistant' || typeof msg.content === 'string') return false
+  return (
+    Array.isArray(msg.content) &&
+    msg.content.some((p: any) => p.type === 'tool-call')
+  )
+}
+
+/** Check if an internal message contains tool results (hyphenated format). */
+export function isInternalToolResultMessage(msg: {
+  role: string
+  content: unknown
+}): boolean {
+  return (
+    msg.role === 'tool' &&
+    Array.isArray(msg.content) &&
+    msg.content.some((p: any) => p.type === 'tool-result')
+  )
+}

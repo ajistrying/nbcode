@@ -77,6 +77,8 @@ import { getFsImplementation } from './fsOperations.js'
 import { getWorktreePaths } from './getWorktreePaths.js'
 import { getBranch } from './git.js'
 import { gracefulShutdownSync, isShuttingDown } from './gracefulShutdown.js'
+import { indexSession, indexTitle, indexTag, indexPrLink } from '../db/sessionIndexer.js'
+import { listSessions as dbListSessions, listAllSessions as dbListAllSessions, type SessionRow } from '../db/queries.js'
 import { parseJSONL } from './json.js'
 import { logError } from './log.js'
 import { extractTag, isCompactBoundaryMessage } from './messages.js'
@@ -987,6 +989,25 @@ class Project {
       for (const entry of buffered) {
         await this.appendEntry(entry)
       }
+    }
+    // Index new session in SQLite
+    try {
+      const sessionId = getSessionId()
+      const projectDir = getSessionProjectDir() ?? getCwd()
+      indexSession({
+        sessionId,
+        projectDir,
+        projectPath: getCwd(),
+        transcriptPath: this.sessionFile ?? undefined,
+        customTitle: this.currentSessionTitle,
+        tag: this.currentSessionTag,
+        agentName: this.currentSessionAgentName,
+        agentColor: this.currentSessionAgentColor,
+        agentSetting: this.currentSessionAgentSetting,
+        mode: this.currentSessionMode,
+      })
+    } catch {
+      // Never block session creation if indexing fails
     }
   }
 
@@ -2631,6 +2652,8 @@ export async function saveCustomTitle(
   if (sessionId === getSessionId()) {
     getProject().currentSessionTitle = customTitle
   }
+  // Index in SQLite for fast search
+  indexTitle(sessionId, customTitle, 'user')
   logEvent('tengu_session_renamed', {
     source:
       source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -2670,6 +2693,8 @@ export function saveAiGeneratedTitle(sessionId: UUID, aiTitle: string): void {
     aiTitle,
     sessionId,
   })
+  // Index in SQLite for fast search
+  indexTitle(sessionId, aiTitle, 'ai')
 }
 
 /**
@@ -2695,6 +2720,8 @@ export async function saveTag(sessionId: UUID, tag: string, fullPath?: string) {
   if (sessionId === getSessionId()) {
     getProject().currentSessionTag = tag
   }
+  // Index in SQLite for fast search
+  indexTag(sessionId, tag)
   logEvent('tengu_session_tagged', {})
 }
 
@@ -2725,6 +2752,8 @@ export async function linkSessionToPR(
     project.currentSessionPrUrl = prUrl
     project.currentSessionPrRepository = prRepository
   }
+  // Index in SQLite
+  indexPrLink(sessionId, prNumber, prUrl, prRepository)
   logEvent('tengu_session_linked_to_pr', { prNumber })
 }
 
@@ -3955,6 +3984,87 @@ export async function loadMessageLogs(limit?: number): Promise<LogOption[]> {
   return sorted
 }
 
+// ---------------------------------------------------------------------------
+// SQLite fast-path: convert DB rows to LogOption for /resume picker
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts SessionRow[] from the SQLite index into LogOption[] suitable for
+ * the /resume picker. These are "lite-style" logs — messages array is empty,
+ * but metadata fields (title, tag, firstPrompt, etc.) are pre-populated from
+ * the DB so no JSONL reads are needed for display.
+ *
+ * Returns an empty array if anything goes wrong (caller falls back to file scan).
+ */
+function sessionRowsToLogOptions(rows: SessionRow[]): LogOption[] {
+  const logs: LogOption[] = []
+  for (const row of rows) {
+    // Skip sessions with no displayable content (mirrors enrichLog filter)
+    const displayTitle = row.customTitle || row.aiTitle || row.lastPrompt || row.firstPrompt || row.summary
+    if (!displayTitle) continue
+
+    logs.push({
+      date: row.updatedAt ? new Date(row.updatedAt).toISOString() : new Date().toISOString(),
+      messages: [],
+      isLite: true,
+      fullPath: row.transcriptPath ?? undefined,
+      value: 0,
+      created: row.createdAt ? new Date(row.createdAt) : new Date(),
+      modified: row.updatedAt ? new Date(row.updatedAt) : new Date(),
+      firstPrompt: row.firstPrompt ?? displayTitle ?? '',
+      messageCount: row.messageCount ?? 0,
+      isSidechain: row.isSidechain ?? false,
+      sessionId: row.id,
+      customTitle: row.customTitle ?? undefined,
+      summary: row.summary ?? undefined,
+      tag: row.tag ?? undefined,
+      agentName: row.agentName ?? undefined,
+      agentColor: row.agentColor ?? undefined,
+      agentSetting: row.agentSetting ?? undefined,
+      mode: (row.mode as LogOption['mode']) ?? undefined,
+      projectPath: row.projectPath ?? undefined,
+    })
+  }
+  // Assign value indices (used as picker selection index)
+  logs.forEach((log, i) => {
+    log.value = i
+  })
+  return logs
+}
+
+/**
+ * Attempts the SQLite fast-path for session listing. Returns enriched
+ * LogOption[] if the DB has sessions, or null to signal fallback.
+ *
+ * projectDir: the raw cwd path stored in the DB (not the sanitized projects dir).
+ * When undefined, queries all projects.
+ */
+function tryDbFastPath(
+  projectDir?: string,
+  limit?: number,
+): LogOption[] | null {
+  try {
+    const rows = projectDir
+      ? dbListSessions(projectDir, limit ?? 100)
+      : dbListAllSessions(limit ?? 100)
+
+    if (rows.length === 0) return null
+
+    const logs = sessionRowsToLogOptions(rows)
+    if (logs.length === 0) return null
+
+    logForDebugging(
+      `/resume: DB fast-path returned ${logs.length} sessions` +
+        (projectDir ? ` for ${projectDir}` : ' (all projects)'),
+    )
+    return logs
+  } catch {
+    // DB unavailable or query failed — fall back silently
+    logForDebugging('/resume: DB fast-path failed, falling back to file scan')
+    return null
+  }
+}
+
 /**
  * Loads message logs from all project directories.
  * @param limit Optional limit on number of session files to load per project (used when no index exists)
@@ -4019,6 +4129,12 @@ export async function loadAllProjectsMessageLogsProgressive(
   limit?: number,
   initialEnrichCount: number = INITIAL_ENRICH_COUNT,
 ): Promise<SessionLogResult> {
+  // Fast path: try SQLite index first (no file reads needed).
+  const dbLogs = tryDbFastPath(undefined, limit)
+  if (dbLogs) {
+    return { logs: dbLogs, allStatLogs: dbLogs, nextIndex: dbLogs.length }
+  }
+
   const projectsDir = getProjectsDir()
 
   let dirents: Dirent[]
@@ -4091,6 +4207,15 @@ export async function loadSameRepoMessageLogsProgressive(
   logForDebugging(
     `/resume: loading sessions for cwd=${getOriginalCwd()}, worktrees=[${worktreePaths.join(', ')}]`,
   )
+
+  // Fast path: try SQLite index first (instant metadata, no file reads).
+  // Falls back to file scanning if DB is empty (first run before backfill).
+  const cwd = getOriginalCwd()
+  const dbLogs = tryDbFastPath(cwd, limit)
+  if (dbLogs) {
+    return { logs: dbLogs, allStatLogs: dbLogs, nextIndex: dbLogs.length }
+  }
+
   const allStatLogs = await getStatOnlyLogsForWorktrees(worktreePaths, limit)
   logForDebugging(`/resume: found ${allStatLogs.length} session files on disk`)
 

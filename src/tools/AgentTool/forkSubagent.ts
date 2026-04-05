@@ -13,6 +13,7 @@ import type {
 } from '../../types/message.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { createUserMessage } from '../../utils/messages.js'
+import { isToolCallBlock } from '../../utils/toolBlockCompat.js'
 import type { BuiltInAgentDefinition } from './loadAgentsDir.js'
 
 /**
@@ -121,7 +122,7 @@ export function buildForkedMessages(
 
   // Collect all tool_use blocks from the assistant message
   const toolUseBlocks = assistantMessage.message.content.filter(
-    (block): block is BetaToolUseBlock => block.type === 'tool_use',
+    (block): block is BetaToolUseBlock => isToolCallBlock(block),
   )
 
   if (toolUseBlocks.length === 0) {

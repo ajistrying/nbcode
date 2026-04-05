@@ -26,6 +26,7 @@ import { buildSubagentLookups, createAssistantMessage, EMPTY_LOOKUPS } from '../
 import type { ModelAlias } from '../../utils/model/aliases.js';
 import { getMainLoopModel, parseUserSpecifiedModel, renderModelName } from '../../utils/model/model.js';
 import type { Theme, ThemeName } from '../../utils/theme.js';
+import { isToolCallBlock, isToolResultBlock, getToolCallId, getToolName, getToolUseId } from '../../utils/toolBlockCompat.js';
 import type { outputSchema, Progress, RemoteLaunchedOutput } from './AgentTool.js';
 import { inputSchema } from './AgentTool.js';
 import { getAgentColor } from './agentColorManager.js';
@@ -70,8 +71,8 @@ function getSearchOrReadInfo(progressMessage: ProgressMessage<Progress>, tools: 
   // Check tool_result (user message) - find corresponding tool use from the map
   if (message.type === 'user') {
     const content = message.message.content[0];
-    if (content?.type === 'tool_result') {
-      const toolUse = toolUseByID.get(content.tool_use_id);
+    if (content && isToolResultBlock(content)) {
+      const toolUse = toolUseByID.get(getToolUseId(content));
       if (toolUse) {
         return getSearchOrReadFromContent(toolUse, tools);
       }
@@ -133,8 +134,8 @@ function processProgressMessages(messages: ProgressMessage<Progress>[], tools: T
     // Track tool_use blocks as we see them
     if (msg.data.message.type === 'assistant') {
       for (const c of msg.data.message.message.content) {
-        if (c.type === 'tool_use') {
-          toolUseByID.set(c.id, c as ToolUseBlockParam);
+        if (isToolCallBlock(c)) {
+          toolUseByID.set(getToolCallId(c), c as ToolUseBlockParam);
         }
       }
     }
@@ -474,7 +475,7 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
         return false;
       }
       const message = msg.data.message;
-      return message.message.content.some(content => content.type === 'tool_use');
+      return message.message.content.some(content => isToolCallBlock(content));
     });
     const latestAssistant = progressMessages.findLast((msg): msg is ProgressMessage<AgentToolProgress> => hasProgressMessage(msg.data) && msg.data.message.type === 'assistant');
     let tokens = null;
@@ -522,7 +523,7 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
     if (!hasProgressMessage(data)) {
       return false;
     }
-    return data.message.message.content.some(content => content.type === 'tool_use');
+    return data.message.message.content.some(content => isToolCallBlock(content));
   });
   const firstData = progressMessages[0]?.data;
   const prompt = firstData && hasProgressMessage(firstData) ? firstData.prompt : undefined;
@@ -633,7 +634,7 @@ function calculateAgentStats(progressMessages: ProgressMessage<Progress>[]): {
       return false;
     }
     const message = msg.data.message;
-    return message.type === 'user' && message.message.content.some(content => content.type === 'tool_result');
+    return message.type === 'user' && message.message.content.some(content => isToolResultBlock(content));
   });
   const latestAssistant = progressMessages.findLast((msg): msg is ProgressMessage<AgentToolProgress> => hasProgressMessage(msg.data) && msg.data.message.type === 'assistant');
   let tokens = null;
@@ -794,8 +795,8 @@ export function extractLastToolInfo(progressMessages: ProgressMessage<Progress>[
     }
     if (pm.data.message.type === 'assistant') {
       for (const c of pm.data.message.message.content) {
-        if (c.type === 'tool_use') {
-          toolUseByID.set(c.id, c as ToolUseBlockParam);
+        if (isToolCallBlock(c)) {
+          toolUseByID.set(getToolCallId(c), c as ToolUseBlockParam);
         }
       }
     }
@@ -833,11 +834,11 @@ export function extractLastToolInfo(progressMessages: ProgressMessage<Progress>[
       return false;
     }
     const message = msg.data.message;
-    return message.type === 'user' && message.message.content.some(c => c.type === 'tool_result');
+    return message.type === 'user' && message.message.content.some(c => isToolResultBlock(c));
   });
   if (lastToolResult?.data.message.type === 'user') {
-    const toolResultBlock = lastToolResult.data.message.message.content.find(c => c.type === 'tool_result');
-    if (toolResultBlock?.type === 'tool_result') {
+    const toolResultBlock = lastToolResult.data.message.message.content.find(c => isToolResultBlock(c));
+    if (toolResultBlock && isToolResultBlock(toolResultBlock)) {
       // Look up the corresponding tool_use — already indexed above
       const toolUseBlock = toolUseByID.get(toolResultBlock.tool_use_id);
       if (toolUseBlock) {

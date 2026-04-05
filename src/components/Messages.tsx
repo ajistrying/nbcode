@@ -28,6 +28,7 @@ import { getGlobalConfig } from '../utils/config.js';
 import { isEnvTruthy } from '../utils/envUtils.js';
 import { isFullscreenEnvEnabled } from '../utils/fullscreen.js';
 import { applyGrouping } from '../utils/groupToolUses.js';
+import { isToolCallBlock, isToolResultBlock, getToolCallId, getToolName } from '../utils/toolBlockCompat.js';
 import { buildMessageLookups, createAssistantMessage, deriveUUID, getMessagesAfterCompactBoundary, getToolUseID, getToolUseIDs, hasUnresolvedHooksFromLookup, isNotEmptyMessage, normalizeMessages, reorderMessagesInUI, type StreamingThinking, type StreamingToolUse, shouldShowUserMessage } from '../utils/messages.js';
 import { plural } from '../utils/stringUtils.js';
 import { renderableSearchText } from '../utils/transcriptSearch.js';
@@ -126,18 +127,17 @@ export function filterForBriefTool<T extends {
       if (msg.isApiErrorMessage) return true;
       // Keep Brief tool_use blocks (renders with standard tool call chrome,
       // and must be in the list so buildMessageLookups can resolve tool results)
-      if (block?.type === 'tool_use' && block.name && nameSet.has(block.name)) {
-        if ('id' in block) {
-          briefToolUseIDs.add((block as {
-            id: string;
-          }).id);
+      if (block && isToolCallBlock(block) && getToolName(block) && nameSet.has(getToolName(block))) {
+        const id = getToolCallId(block);
+        if (id) {
+          briefToolUseIDs.add(id);
         }
         return true;
       }
       return false;
     }
     if (msg.type === 'user') {
-      if (block?.type === 'tool_result') {
+      if (block && isToolResultBlock(block)) {
         return block.tool_use_id !== undefined && briefToolUseIDs.has(block.tool_use_id);
       }
       // Real user input only — drop meta/tick messages.
@@ -185,14 +185,14 @@ export function dropTextInBriefTurns<T extends {
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i]!;
     const block = msg.message?.content[0];
-    if (msg.type === 'user' && block?.type !== 'tool_result' && !msg.isMeta) {
+    if (msg.type === 'user' && !(block && isToolResultBlock(block)) && !msg.isMeta) {
       turn++;
       continue;
     }
     if (msg.type === 'assistant') {
       if (block?.type === 'text') {
         textIndexToTurn[i] = turn;
-      } else if (block?.type === 'tool_use' && block.name && nameSet.has(block.name)) {
+      } else if (block && isToolCallBlock(block) && getToolName(block) && nameSet.has(getToolName(block))) {
         turnsWithBrief.add(turn);
       }
     }
@@ -408,7 +408,7 @@ const MessagesImpl = ({
           }
         }
       } else if (msg?.type === 'user') {
-        const hasToolResult = msg.message.content.some(block => block.type === 'tool_result');
+        const hasToolResult = msg.message.content.some(block => isToolResultBlock(block));
         if (!hasToolResult) {
           // Reached a previous user turn so don't show stale thinking from before
           return 'no-thinking';
@@ -655,7 +655,7 @@ const MessagesImpl = ({
     // extractSearchText, prefer that — it's precise (tool-owned)
     // vs renderableSearchText's field-name heuristic.
     if (msg_9.type === 'user' && msg_9.toolUseResult && Array.isArray(msg_9.message.content)) {
-      const tr = msg_9.message.content.find(b_1 => b_1.type === 'tool_result');
+      const tr = msg_9.message.content.find(b_1 => isToolResultBlock(b_1));
       if (tr && 'tool_use_id' in tr) {
         const tu = lookups_0.toolUseByToolUseID.get(tr.tool_use_id);
         const tool_0 = tu && findToolByName(tools, tu.name);
@@ -819,7 +819,7 @@ export function shouldRenderStatically(message: RenderableMessage, streamingTool
       {
         const allResolved = message.messages.every(msg => {
           const content = msg.message.content[0];
-          return content?.type === 'tool_use' && lookups.resolvedToolUseIDs.has(content.id);
+          return content && isToolCallBlock(content) && lookups.resolvedToolUseIDs.has(getToolCallId(content));
         });
         return allResolved;
       }

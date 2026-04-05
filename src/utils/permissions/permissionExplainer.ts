@@ -2,6 +2,11 @@ import { z } from 'zod/v4'
 import { logEvent } from '../../services/analytics/index.js'
 import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.js'
 import type { AssistantMessage, Message } from '../../types/message.js'
+import {
+  isToolCallBlock,
+  getToolName,
+  getToolInput,
+} from '../toolBlockCompat.js'
 import { getGlobalConfig } from '../config.js'
 import { logForDebugging } from '../debug.js'
 import { errorMessage } from '../errors.js'
@@ -191,12 +196,12 @@ Explain this command in context.`
     )
 
     // Extract structured data from tool use block
-    const toolUseBlock = response.content.find(c => c.type === 'tool_use')
-    if (toolUseBlock && toolUseBlock.type === 'tool_use') {
+    const toolUseBlock = response.content.find(c => isToolCallBlock(c))
+    if (toolUseBlock && isToolCallBlock(toolUseBlock)) {
       logForDebugging(
-        `Permission explainer: tool input: ${jsonStringify(toolUseBlock.input).slice(0, 500)}`,
+        `Permission explainer: tool input: ${jsonStringify(getToolInput(toolUseBlock)).slice(0, 500)}`,
       )
-      const result = RiskAssessmentSchema().safeParse(toolUseBlock.input)
+      const result = RiskAssessmentSchema().safeParse(getToolInput(toolUseBlock))
 
       if (result.success) {
         const explanation: PermissionExplanation = {

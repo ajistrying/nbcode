@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto'
 import { queryModelWithStreaming } from '../services/api/claude.js'
+import { adaptedQueryModelWithStreaming } from '../services/api/streamAdapter.js'
 import { autoCompactIfNeeded } from '../services/compact/autoCompact.js'
 import { microcompactMessages } from '../services/compact/microCompact.js'
+import { getAPIProvider } from '../utils/model/providers.js'
 
 // -- deps
 
@@ -22,6 +24,12 @@ export type QueryDeps = {
   // -- model
   callModel: typeof queryModelWithStreaming
 
+  // -- model (adapted, dual-emit: legacy + InternalStreamPart)
+  // Optional so existing call sites and tests are unaffected.
+  // New consumers can use this to read InternalStreamPart events
+  // while the legacy path continues to work via callModel.
+  callModelAdapted?: typeof adaptedQueryModelWithStreaming
+
   // -- compaction
   microcompact: typeof microcompactMessages
   autocompact: typeof autoCompactIfNeeded
@@ -30,9 +38,17 @@ export type QueryDeps = {
   uuid: () => string
 }
 
-export function productionDeps(): QueryDeps {
+export async function productionDeps(): Promise<QueryDeps> {
+  let callModel: typeof queryModelWithStreaming = queryModelWithStreaming
+  if (getAPIProvider() === 'openai_compatible') {
+    const { queryModelOpenAIWithStreaming } = await import(
+      '../services/api/openai/aiSdkAdapter.js'
+    )
+    callModel = queryModelOpenAIWithStreaming
+  }
   return {
-    callModel: queryModelWithStreaming,
+    callModel,
+    callModelAdapted: adaptedQueryModelWithStreaming,
     microcompact: microcompactMessages,
     autocompact: autoCompactIfNeeded,
     uuid: randomUUID,

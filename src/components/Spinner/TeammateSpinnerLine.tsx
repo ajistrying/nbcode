@@ -13,6 +13,7 @@ import { summarizeRecentActivities } from '../../utils/collapseReadSearch.js';
 import { formatDuration, formatNumber, truncateToWidth } from '../../utils/format.js';
 import { toInkColor } from '../../utils/ink.js';
 import { TEAMMATE_SELECT_HINT } from './teammateSelectHint.js';
+import { isToolCallBlock, getToolName } from '../../utils/toolBlockCompat.js';
 type Props = {
   teammate: InProcessTeammateTaskState;
   isLast: boolean;
@@ -42,10 +43,10 @@ function getMessagePreview(messages: InProcessTeammateTaskState['messages']): st
     for (const block of content) {
       if (allLines.length >= 3) break;
       if (!block || typeof block !== 'object') continue;
-      if ('type' in block && block.type === 'tool_use' && 'name' in block) {
+      if ('type' in block && isToolCallBlock(block as { type: string })) {
         // Try to show meaningful info from tool input
         const input = 'input' in block ? block.input as Record<string, unknown> : null;
-        let toolLine = `Using ${block.name}…`;
+        let toolLine = `Using ${getToolName(block as Record<string, unknown>)}…`;
         if (input) {
           // Look for common descriptive fields
           const desc = input.description as string | undefined || input.prompt as string | undefined || input.command as string | undefined || input.query as string | undefined || input.pattern as string | undefined;

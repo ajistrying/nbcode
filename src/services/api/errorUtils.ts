@@ -198,6 +198,10 @@ function extractNestedErrorMessage(error: APIError): string | null {
 }
 
 export function formatAPIError(error: APIError): string {
+  if (!error) {
+    return 'Unknown API error'
+  }
+
   // Extract connection error details from the cause chain
   const connectionDetails = extractConnectionErrorDetails(error)
 

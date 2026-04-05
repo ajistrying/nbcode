@@ -7,9 +7,10 @@ import {
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import { findToolByName, type Tools, type ToolUseContext } from '../../Tool.js'
 import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
+import type { InternalToolCallPart } from '../../types/internal-messages.js'
 import type { AssistantMessage, Message } from '../../types/message.js'
 import { createChildAbortController } from '../../utils/abortController.js'
-import { runToolUse } from './toolExecution.js'
+import { runToolUse, toolUseBlockToInternalToolCall } from './toolExecution.js'
 
 type MessageUpdate = {
   message?: Message
@@ -21,6 +22,8 @@ type ToolStatus = 'queued' | 'executing' | 'completed' | 'yielded'
 type TrackedTool = {
   id: string
   block: ToolUseBlock
+  /** Lazily-computed provider-neutral representation of the tool call. */
+  internalToolCall?: InternalToolCallPart
   assistantMessage: AssistantMessage
   status: ToolStatus
   isConcurrencySafe: boolean
@@ -29,6 +32,14 @@ type TrackedTool = {
   // Progress messages are stored separately and yielded immediately
   pendingProgress: Message[]
   contextModifiers?: Array<(context: ToolUseContext) => ToolUseContext>
+}
+
+/** Get or compute the InternalToolCallPart for a TrackedTool. */
+function getInternalToolCall(tool: TrackedTool): InternalToolCallPart {
+  if (!tool.internalToolCall) {
+    tool.internalToolCall = toolUseBlockToInternalToolCall(tool.block)
+  }
+  return tool.internalToolCall
 }
 
 /**

@@ -260,7 +260,7 @@ async function* queryLoop(
     maxTurns,
     skipCacheWrite,
   } = params
-  const deps = params.deps ?? productionDeps()
+  const deps = params.deps ?? (await productionDeps())
 
   // Mutable cross-iteration state. The loop body destructures this at the top
   // of each iteration so reads stay bare-name (`messages`, `toolUseContext`).

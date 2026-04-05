@@ -290,6 +290,9 @@ import { useMessageActions, MessageActionsKeybindings, MessageActionsBar, type M
 import { setClipboard } from '../ink/termio/osc.js';
 import type { ScrollBoxHandle } from '../ink/components/ScrollBox.js';
 import { createAttachmentMessage, getQueuedCommandAttachments } from '../utils/attachments.js';
+import { parseSlashCommand } from '../services/keybindings/keyHandler.js';
+import { dequeueHead } from '../services/permissions/permissionHandler.js';
+import { shouldShowPlaceholder } from '../services/sessions/sessionHandler.js';
 
 // Stable empty array for hooks that accept MCPServerConnection[] — avoids
 // creating a new [] literal on every render in remote mode, which would
@@ -3166,14 +3169,7 @@ export function REPL({
       // the pasted content, not the placeholder. The non-immediate path gets
       // this expansion later in handlePromptSubmit.
       const trimmedInput = expandPastedTextRefs(input, pastedContents).trim();
-      const spaceIndex = trimmedInput.indexOf(' ');
-      const commandName = spaceIndex === -1 ? trimmedInput.slice(1) : trimmedInput.slice(1, spaceIndex);
-      const commandArgs = spaceIndex === -1 ? '' : trimmedInput.slice(spaceIndex + 1).trim();
-
-      // Find matching command - treat as immediate if:
-      // 1. Command has `immediate: true`, OR
-      // 2. Command was triggered via keybinding (fromKeybinding option)
-      const matchingCommand = commands.find(cmd => isCommandEnabled(cmd) && (cmd.name === commandName || cmd.aliases?.includes(commandName) || getCommandName(cmd) === commandName));
+      const { commandName, commandArgs, matchingCommand } = parseSlashCommand(trimmedInput, commands);
       if (matchingCommand?.name === 'clear' && idleHintShownRef.current) {
         logEvent('tengu_idle_return_action', {
           action: 'hint_converted' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -3416,10 +3412,7 @@ export function REPL({
     // process — they have no remote equivalent. Let those fall through to
     // handlePromptSubmit so they execute locally. Prompt commands and
     // plain text go to the remote.
-    if (activeRemote.isRemoteMode && !(isSlashCommand && commands.find(c => {
-      const name = input.trim().slice(1).split(/\s/)[0];
-      return isCommandEnabled(c) && (c.name === name || c.aliases?.includes(name!) || getCommandName(c) === name);
-    })?.type === 'local-jsx')) {
+    if (activeRemote.isRemoteMode && !(isSlashCommand && parseSlashCommand(input.trim(), commands).matchingCommand?.type === 'local-jsx')) {
       // Build content blocks when there are pasted attachments (images)
       const pastedValues = Object.values(pastedContents);
       const imageContents = pastedValues.filter(c => c.type === 'image');
@@ -4518,8 +4511,8 @@ export function REPL({
   // while deferredMessages lags behind messages. Suppressed when viewing an
   // agent — displayedMessages is a different array there, and onAgentSubmit
   // doesn't use the placeholder anyway.
-  const placeholderText = userInputOnProcessing && !viewedAgentTask && displayedMessages.length <= userInputBaselineRef.current ? userInputOnProcessing : undefined;
-  const toolPermissionOverlay = focusedInputDialog === 'tool-permission' ? <PermissionRequest key={toolUseConfirmQueue[0]?.toolUseID} onDone={() => setToolUseConfirmQueue(([_, ...tail]) => tail)} onReject={handleQueuedCommandOnCancel} toolUseConfirm={toolUseConfirmQueue[0]!} toolUseContext={getToolUseContext(messages, messages, abortController ?? createAbortController(), mainLoopModel)} verbose={verbose} workerBadge={toolUseConfirmQueue[0]?.workerBadge} setStickyFooter={isFullscreenEnvEnabled() ? setPermissionStickyFooter : undefined} /> : null;
+  const placeholderText = shouldShowPlaceholder(userInputOnProcessing, !!viewedAgentTask, displayedMessages.length, userInputBaselineRef.current);
+  const toolPermissionOverlay = focusedInputDialog === 'tool-permission' ? <PermissionRequest key={toolUseConfirmQueue[0]?.toolUseID} onDone={() => setToolUseConfirmQueue(prev => dequeueHead(prev))} onReject={handleQueuedCommandOnCancel} toolUseConfirm={toolUseConfirmQueue[0]!} toolUseContext={getToolUseContext(messages, messages, abortController ?? createAbortController(), mainLoopModel)} verbose={verbose} workerBadge={toolUseConfirmQueue[0]?.workerBadge} setStickyFooter={isFullscreenEnvEnabled() ? setPermissionStickyFooter : undefined} /> : null;
 
   // Narrow terminals: companion collapses to a one-liner that REPL stacks
   // on its own row (above input in fullscreen, below in scrollback) instead

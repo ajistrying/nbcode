@@ -4,6 +4,11 @@ import { tmpdir } from 'os'
 import { dirname, join } from 'path'
 import { createInterface } from 'readline'
 import { jsonParse, jsonStringify } from '../utils/slowOperations.js'
+import {
+  isToolCallBlock,
+  getToolName,
+  getToolInput,
+} from '../utils/toolBlockCompat.js'
 import { debugTruncate } from './debugUtils.js'
 import type {
   SessionActivity,
@@ -135,9 +140,9 @@ function extractActivities(
         if (!block || typeof block !== 'object') continue
         const b = block as Record<string, unknown>
 
-        if (b.type === 'tool_use') {
-          const name = (b.name as string) ?? 'Tool'
-          const input = (b.input as Record<string, unknown>) ?? {}
+        if (isToolCallBlock(b as { type: string })) {
+          const name = (getToolName(b) as string) ?? 'Tool'
+          const input = (getToolInput(b) as Record<string, unknown>) ?? {}
           const summary = toolSummary(name, input)
           activities.push({
             type: 'tool_start',

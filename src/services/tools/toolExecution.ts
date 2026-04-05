@@ -9,6 +9,16 @@ import {
   logEvent,
 } from 'src/services/analytics/index.js'
 import {
+  textOutput,
+  errorOutput,
+  deniedOutput,
+} from '../../types/internal-messages.js'
+import type {
+  InternalToolResultPart,
+  InternalToolResultOutput,
+} from '../../types/internal-messages.js'
+import { internalToolResultToAnthropic } from '../api/converters/anthropic.js'
+import {
   extractMcpToolDetails,
   extractSkillName,
   extractToolInputForTelemetry,
@@ -135,6 +145,89 @@ export const HOOK_TIMING_DISPLAY_THRESHOLD_MS = 500
 /** Log a debug warning when hooks/permission-decision block for this long. Matches
  * BashTool's PROGRESS_THRESHOLD_MS — the collapsed view feels stuck past this. */
 const SLOW_PHASE_LOG_THRESHOLD_MS = 2000
+
+// ═══════════════════════════════════════════════════════════════════
+// Transitional tool result helpers
+//
+// These functions create tool results in BOTH internal and legacy
+// (Anthropic SDK) formats. During the migration, code can start using
+// the internal format for new logic while the legacy format keeps
+// backward compatibility with existing message construction.
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Create a tool result in both internal and legacy (Anthropic) formats.
+ * Use this in new code to gradually shift toward provider-neutral types
+ * while maintaining backward compatibility with the existing message system.
+ */
+export function createToolResult(
+  toolCallId: string,
+  toolName: string,
+  output: InternalToolResultOutput,
+): { internal: InternalToolResultPart; legacy: ToolResultBlockParam } {
+  const internal: InternalToolResultPart = {
+    type: 'tool-result',
+    toolCallId,
+    toolName,
+    output,
+  }
+  return {
+    internal,
+    legacy: internalToolResultToAnthropic(internal),
+  }
+}
+
+/**
+ * Create a text tool result in both formats.
+ * Convenience wrapper around createToolResult for the common text case.
+ */
+export function createTextToolResult(
+  toolCallId: string,
+  toolName: string,
+  text: string,
+): { internal: InternalToolResultPart; legacy: ToolResultBlockParam } {
+  return createToolResult(toolCallId, toolName, textOutput(text))
+}
+
+/**
+ * Create an error tool result in both formats.
+ * Convenience wrapper around createToolResult for the common error case.
+ */
+export function createErrorToolResult(
+  toolCallId: string,
+  toolName: string,
+  errorText: string,
+): { internal: InternalToolResultPart; legacy: ToolResultBlockParam } {
+  return createToolResult(toolCallId, toolName, errorOutput(errorText))
+}
+
+/**
+ * Create a denied tool result in both formats.
+ * Convenience wrapper around createToolResult for permission denials.
+ */
+export function createDeniedToolResult(
+  toolCallId: string,
+  toolName: string,
+  reason?: string,
+): { internal: InternalToolResultPart; legacy: ToolResultBlockParam } {
+  return createToolResult(toolCallId, toolName, deniedOutput(reason))
+}
+
+/**
+ * Convert a ToolUseBlock to an InternalToolCallPart.
+ * Use during the transition to bridge between Anthropic SDK types and
+ * the provider-neutral internal types at tool dispatch boundaries.
+ */
+export function toolUseBlockToInternalToolCall(
+  block: ToolUseBlock,
+): import('../../types/internal-messages.js').InternalToolCallPart {
+  return {
+    type: 'tool-call',
+    toolCallId: block.id,
+    toolName: block.name,
+    input: block.input,
+  }
+}
 
 /**
  * Classify a tool execution error into a telemetry-safe string.

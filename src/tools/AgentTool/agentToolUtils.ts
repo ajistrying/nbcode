@@ -13,6 +13,7 @@ import {
   logEvent,
 } from '../../services/analytics/index.js'
 import { clearDumpState } from '../../services/api/dumpPrompts.js'
+import { isToolCallBlock, getToolCallId, getToolName } from '../../utils/toolBlockCompat.js'
 import type { AppState } from '../../state/AppState.js'
 import type {
   Tool,
@@ -264,7 +265,7 @@ export function countToolUses(messages: MessageType[]): number {
   for (const m of messages) {
     if (m.type === 'assistant') {
       for (const block of m.message.content) {
-        if (block.type === 'tool_use') {
+        if (isToolCallBlock(block)) {
           count++
         }
       }
@@ -362,8 +363,8 @@ export function finalizeAgentTool(
  */
 export function getLastToolUseName(message: MessageType): string | undefined {
   if (message.type !== 'assistant') return undefined
-  const block = message.message.content.findLast(b => b.type === 'tool_use')
-  return block?.type === 'tool_use' ? block.name : undefined
+  const block = message.message.content.findLast(b => isToolCallBlock(b))
+  return block && isToolCallBlock(block) ? getToolName(block) : undefined
 }
 
 export function emitTaskProgress(

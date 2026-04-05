@@ -11,6 +11,7 @@
  */
 
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs'
+import { isToolResultBlock } from '../utils/toolBlockCompat.js'
 import axios from 'axios'
 import { randomUUID } from 'crypto'
 import { mkdir, writeFile } from 'fs/promises'

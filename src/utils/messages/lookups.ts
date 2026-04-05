@@ -23,6 +23,7 @@ import type {
 } from '../attachments.js'
 import { count } from '../array.js'
 import type { BetaToolUseBlock } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { InternalToolCallPart } from '../../types/internal-messages.js'
 import { EMPTY_STRING_SET } from './types.js'
 
 // Hook attachments that have a hookName field (excludes HookPermissionDecisionAttachment)
@@ -496,4 +497,17 @@ export function hasUnresolvedHooksFromLookup(
   const resolvedCount =
     lookups.resolvedHookCounts.get(toolUseID)?.get(hookEvent) ?? 0
   return inProgressCount > resolvedCount
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Internal (provider-neutral) lookup helpers
+// ═══════════════════════════════════════════════════════════════════
+
+/** Extract all tool call parts from a message with internal content format. */
+export function getInternalToolCallParts(
+  content: unknown[],
+): InternalToolCallPart[] {
+  return (content as any[]).filter(
+    (p): p is InternalToolCallPart => p.type === 'tool-call',
+  )
 }

@@ -16,6 +16,7 @@ import { query } from '../../query.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
 import { getDumpPromptsPath } from '../../services/api/dumpPrompts.js'
 import { cleanupAgentTracking } from '../../services/api/promptCacheBreakDetection.js'
+import { isToolCallBlock, isToolResultBlock, getToolCallId, getToolUseId } from '../../utils/toolBlockCompat.js'
 import {
   connectToServer,
   fetchToolsForClient,
@@ -873,8 +874,8 @@ export function filterIncompleteToolCalls(messages: Message[]): Message[] {
       const content = userMessage.message.content
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === 'tool_result' && block.tool_use_id) {
-            toolUseIdsWithResults.add(block.tool_use_id)
+          if (isToolResultBlock(block) && getToolUseId(block)) {
+            toolUseIdsWithResults.add(getToolUseId(block))
           }
         }
       }
@@ -890,9 +891,9 @@ export function filterIncompleteToolCalls(messages: Message[]): Message[] {
         // Check if this assistant message has any tool uses without results
         const hasIncompleteToolCall = content.some(
           block =>
-            block.type === 'tool_use' &&
-            block.id &&
-            !toolUseIdsWithResults.has(block.id),
+            isToolCallBlock(block) &&
+            getToolCallId(block) &&
+            !toolUseIdsWithResults.has(getToolCallId(block)),
         )
         // Exclude messages with incomplete tool calls
         return !hasIncompleteToolCall

@@ -14,6 +14,7 @@ import { useKeybinding, useKeybindings } from '../keybindings/useKeybinding.js';
 import type { Message, PartialCompactDirection, UserMessage } from '../types/message.js';
 import { stripDisplayTags } from '../utils/displayTags.js';
 import { createUserMessage, extractTag, isEmptyMessageText, isSyntheticMessage, isToolUseResultMessage } from '../utils/messages.js';
+import { isToolCallBlock, isToolResultBlock } from '../utils/toolBlockCompat.js';
 import { type OptionWithDescription, Select } from './CustomSelect/select.js';
 import { Spinner } from './Spinner.js';
 function isTextBlock(block: ContentBlockParam): block is TextBlockParam {
@@ -768,7 +769,7 @@ export function selectableUserMessagesFilter(message: Message): message is UserM
   if (message.type !== 'user') {
     return false;
   }
-  if (Array.isArray(message.message.content) && message.message.content[0]?.type === 'tool_result') {
+  if (Array.isArray(message.message.content) && message.message.content[0] && isToolResultBlock(message.message.content[0])) {
     return false;
   }
   if (isSyntheticMessage(message)) {
@@ -813,7 +814,7 @@ export function messagesAfterAreOnlySynthetic(messages: Message[], fromIndex: nu
     if (msg.type === 'assistant') {
       const content = msg.message.content;
       if (Array.isArray(content)) {
-        const hasMeaningfulContent = content.some(block => block.type === 'text' && block.text.trim() || block.type === 'tool_use');
+        const hasMeaningfulContent = content.some(block => block.type === 'text' && block.text.trim() || isToolCallBlock(block));
         if (hasMeaningfulContent) return false;
       }
       continue;

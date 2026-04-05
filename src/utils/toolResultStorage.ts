@@ -16,6 +16,8 @@ import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growt
 import { logEvent } from '../services/analytics/index.js'
 import { sanitizeToolNameForAnalytics } from '../services/analytics/metadata.js'
 import type { Message } from '../types/message.js'
+import type { InternalToolResultPart } from '../types/internal-messages.js'
+import { internalToolResultToAnthropic } from '../services/api/converters/anthropic.js'
 import { logForDebugging } from './debug.js'
 import { getErrnoCode, toError } from './errors.js'
 import { formatFileSize } from './format.js'
@@ -1037,4 +1039,15 @@ function getFileSystemErrorMessage(error: Error): string {
     }
   }
   return error.message
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Internal (provider-neutral) type bridge
+// ═══════════════════════════════════════════════════════════════════
+
+/** Convert an internal tool result to the legacy Anthropic format for storage. */
+export function internalToStorageFormat(
+  result: InternalToolResultPart,
+): ToolResultBlockParam {
+  return internalToolResultToAnthropic(result) as unknown as ToolResultBlockParam
 }

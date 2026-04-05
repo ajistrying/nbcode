@@ -7,6 +7,7 @@ import { useKeybindings } from '../keybindings/useKeybinding.js';
 import { logEvent } from '../services/analytics/index.js';
 import type { NormalizedUserMessage, RenderableMessage } from '../types/message.js';
 import { isEmptyMessageText, SYNTHETIC_MESSAGES } from '../utils/messages.js';
+import { isToolCallBlock, getToolCallId, getToolName } from '../utils/toolBlockCompat.js';
 const NAVIGABLE_TYPES = ['user', 'assistant', 'grouped_tool_use', 'collapsed_read_search', 'system', 'attachment'] as const;
 export type NavigableType = (typeof NAVIGABLE_TYPES)[number];
 export type NavigableOf<T extends NavigableType> = Extract<RenderableMessage, {
@@ -22,7 +23,7 @@ export function isNavigableMessage(msg: NavigableMessage): boolean {
         const b = msg.message.content[0];
         // Text responses (minus AssistantTextMessage's return-null cases — tier-1
         // misses unmeasured virtual items), or tool calls with extractable input.
-        return b?.type === 'text' && !isEmptyMessageText(b.text) && !SYNTHETIC_MESSAGES.has(b.text) || b?.type === 'tool_use' && b.name in PRIMARY_INPUT;
+        return b?.type === 'text' && !isEmptyMessageText(b.text) && !SYNTHETIC_MESSAGES.has(b.text) || (b && isToolCallBlock(b)) && getToolName(b) in PRIMARY_INPUT;
       }
     case 'user':
       {
@@ -125,14 +126,14 @@ export function toolCallOf(msg: NavigableMessage): {
 } | undefined {
   if (msg.type === 'assistant') {
     const b = msg.message.content[0];
-    if (b?.type === 'tool_use') return {
-      name: b.name,
+    if (b && isToolCallBlock(b)) return {
+      name: getToolName(b),
       input: b.input as Record<string, unknown>
     };
   }
   if (msg.type === 'grouped_tool_use') {
     const b = msg.messages[0]?.message.content[0];
-    if (b?.type === 'tool_use') return {
+    if (b && isToolCallBlock(b)) return {
       name: msg.toolName,
       input: b.input as Record<string, unknown>
     };

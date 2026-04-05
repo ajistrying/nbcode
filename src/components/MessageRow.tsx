@@ -8,6 +8,7 @@ import type { RenderableMessage } from '../types/message.js';
 import { getDisplayMessageFromCollapsed, getToolSearchOrReadInfo, getToolUseIdsFromCollapsedGroup, hasAnyToolInProgress } from '../utils/collapseReadSearch.js';
 import { type buildMessageLookups, EMPTY_STRING_SET, getProgressMessagesFromLookup, getSiblingToolUseIDsFromLookup, getToolUseID } from '../utils/messages.js';
 import { hasThinkingContent, Message } from './Message.js';
+import { isToolCallBlock, isToolResultBlock, getToolCallId, getToolName } from '../utils/toolBlockCompat.js';
 import { MessageModel } from './MessageModel.js';
 import { shouldRenderStatically } from './Messages.js';
 import { MessageTimestamp } from './MessageTimestamp.js';
@@ -55,14 +56,14 @@ export function hasContentAfterIndex(messages: RenderableMessage[], index: numbe
       if (content?.type === 'thinking' || content?.type === 'redacted_thinking') {
         continue;
       }
-      if (content?.type === 'tool_use') {
-        if (getToolSearchOrReadInfo(content.name, content.input, tools).isCollapsible) {
+      if (content && isToolCallBlock(content)) {
+        if (getToolSearchOrReadInfo(getToolName(content), content.input, tools).isCollapsible) {
           continue;
         }
         // Non-collapsible tool uses appear in syntheticStreamingToolUseMessages
         // before their ID is added to inProgressToolUseIDs. Skip while streaming
         // to avoid briefly finalizing the read group.
-        if (streamingToolUseIDs.has(content.id)) {
+        if (streamingToolUseIDs.has(getToolCallId(content))) {
           continue;
         }
       }
@@ -74,7 +75,7 @@ export function hasContentAfterIndex(messages: RenderableMessage[], index: numbe
     // Tool results arrive while the collapsed group is still being built
     if (msg?.type === 'user') {
       const content = msg.message.content[0];
-      if (content?.type === 'tool_result') {
+      if (content && isToolResultBlock(content)) {
         continue;
       }
     }
@@ -174,7 +175,7 @@ function MessageRowImpl(t0) {
         if ($[26] !== inProgressToolUseIDs) {
           t6 = m => {
             const content = m.message.content[0];
-            return content?.type === "tool_use" && inProgressToolUseIDs.has(content.id);
+            return content && isToolCallBlock(content) && inProgressToolUseIDs.has(getToolCallId(content));
           };
           $[26] = inProgressToolUseIDs;
           $[27] = t6;
@@ -297,7 +298,7 @@ export function isMessageStreaming(msg: RenderableMessage, streamingToolUseIDs: 
   if (msg.type === 'grouped_tool_use') {
     return msg.messages.some(m => {
       const content = m.message.content[0];
-      return content?.type === 'tool_use' && streamingToolUseIDs.has(content.id);
+      return content && isToolCallBlock(content) && streamingToolUseIDs.has(getToolCallId(content));
     });
   }
   if (msg.type === 'collapsed_read_search') {
@@ -316,7 +317,7 @@ export function allToolsResolved(msg: RenderableMessage, resolvedToolUseIDs: Set
   if (msg.type === 'grouped_tool_use') {
     return msg.messages.every(m => {
       const content = m.message.content[0];
-      return content?.type === 'tool_use' && resolvedToolUseIDs.has(content.id);
+      return content && isToolCallBlock(content) && resolvedToolUseIDs.has(getToolCallId(content));
     });
   }
   if (msg.type === 'collapsed_read_search') {

@@ -9,6 +9,7 @@ import { UserToolErrorMessage } from './UserToolErrorMessage.js';
 import { UserToolRejectMessage } from './UserToolRejectMessage.js';
 import { UserToolSuccessMessage } from './UserToolSuccessMessage.js';
 import { useGetToolFromMessages } from './utils.js';
+import { isToolResultBlock, getToolUseId } from '../../../utils/toolBlockCompat.js';
 type Props = {
   param: ToolResultBlockParam;
   message: NormalizedUserMessage;
@@ -33,7 +34,7 @@ export function UserToolResultMessage(t0) {
     width,
     isTranscriptMode
   } = t0;
-  const toolUse = useGetToolFromMessages(param.tool_use_id, tools, lookups);
+  const toolUse = useGetToolFromMessages(getToolUseId(param), tools, lookups);
   if (!toolUse) {
     return null;
   }

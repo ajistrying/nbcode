@@ -40,6 +40,17 @@ export { registerCustomServer, clearCustomServers } from './servers.js'
 export { detectLanguage, getServerConfig, getServerConfigForFile } from './detector.js'
 export { getRunningServerCount, getRunningServers, detectProjectRoot } from './launcher.js'
 
+// Track all files that have been accessed during this session.
+// Used by /diagnostics to show diagnostics for all touched files.
+const accessedFiles = new Set<string>()
+
+/**
+ * Get the set of all file paths accessed during this session.
+ */
+export function getAccessedFiles(): ReadonlySet<string> {
+  return accessedFiles
+}
+
 /**
  * Notify the LSP system that a file has been accessed (read or edited).
  *
@@ -64,6 +75,9 @@ export async function notifyFileAccessed(
   content?: string,
 ): Promise<void> {
   try {
+    // Track every accessed file for /diagnostics
+    accessedFiles.add(path.resolve(filePath))
+
     const client = await ensureServerForFile(filePath)
     if (!client) return
 
