@@ -120,9 +120,3 @@ nbcode --model claude-sonnet-4-6-20250514
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full pipeline documentation.
-
----
-
-## License
-
-The original Claude Code source is the property of Anthropic. This fork exists because the source was publicly exposed through their npm distribution. Use at your own discretion.
